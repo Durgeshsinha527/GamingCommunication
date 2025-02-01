@@ -1,178 +1,152 @@
-(function () {
-  var eventHandlers = {};
+Here's a simple HTML, CSS, and JavaScript code for a basic puzzle game where you need to arrange shuffled pieces of an image in the correct order.
 
-  // Parse init params from location hash: for Android < 5.0, TDesktop
-  var locationHash = '';
-  try {
-    locationHash = location.hash.toString();
-  } catch (e) {}
+Features:
 
-  var initParams = urlParseHashParams(locationHash);
+A 3x3 sliding puzzle
 
-  var isIframe = false;
-  try {
-    isIframe = (window.parent != null && window != window.parent);
-  } catch (e) {}
+Random shuffling at the start
+
+Click to move tiles
 
 
-  function urlSafeDecode(urlencoded) {
-    try {
-      return decodeURIComponent(urlencoded);
-    } catch (e) {
-      return urlencoded;
-    }
-  }
 
-  function urlParseHashParams(locationHash) {
-    locationHash = locationHash.replace(/^#/, '');
-    var params = {};
-    if (!locationHash.length) {
-      return params;
-    }
-    if (locationHash.indexOf('=') < 0 && locationHash.indexOf('?') < 0) {
-      params._path = urlSafeDecode(locationHash);
-      return params;
-    }
-    var qIndex = locationHash.indexOf('?');
-    if (qIndex >= 0) {
-      var pathParam = locationHash.substr(0, qIndex);
-      params._path = urlSafeDecode(pathParam);
-      locationHash = locationHash.substr(qIndex + 1);
-    }
-    var locationHashParams = locationHash.split('&');
-    var i, param, paramName, paramValue;
-    for (i = 0; i < locationHashParams.length; i++) {
-      param = locationHashParams[i].split('=');
-      paramName = urlSafeDecode(param[0]);
-      paramValue = param[1] == null ? null : urlSafeDecode(param[1]);
-      params[paramName] = paramValue;
-    }
-    return params;
-  }
+---
 
-  // Telegram apps will implement this logic to add service params (e.g. tgShareScoreUrl) to game URL
-  function urlAppendHashParams(url, addHash) {
-    // url looks like 'https://game.com/path?query=1#hash'
-    // addHash looks like 'tgShareScoreUrl=' + encodeURIComponent('tgb://share_game_score?hash=very_long_hash123')
+Code:
 
-    var ind = url.indexOf('#');
-    if (ind < 0) {
-      // https://game.com/path -> https://game.com/path#tgShareScoreUrl=etc
-      return url + '#' + addHash;
-    }
-    var curHash = url.substr(ind + 1);
-    if (curHash.indexOf('=') >= 0 || curHash.indexOf('?') >= 0) {
-      // https://game.com/#hash=1 -> https://game.com/#hash=1&tgShareScoreUrl=etc
-      // https://game.com/#path?query -> https://game.com/#path?query&tgShareScoreUrl=etc
-      return url + '&' + addHash;
-    }
-    // https://game.com/#hash -> https://game.com/#hash?tgShareScoreUrl=etc
-    if (curHash.length > 0) {
-      return url + '?' + addHash;
-    }
-    // https://game.com/# -> https://game.com/#tgShareScoreUrl=etc
-    return url + addHash;
-  }
-
-
-  function postEvent (eventType, callback, eventData) {
-    if (!callback) {
-      callback = function () {};
-    }
-    if (eventData === undefined) {
-      eventData = '';
-    }
-
-    if (window.TelegramWebviewProxy !== undefined) {
-      TelegramWebviewProxy.postEvent(eventType, eventData);
-      callback();
-    }
-    else if (window.external && 'notify' in window.external) {
-      window.external.notify(JSON.stringify({eventType: eventType, eventData: eventData}));
-      callback();
-    }
-    else if (isIframe) {
-      try {
-        var trustedTarget = 'https://web.telegram.org';
-        // For now we don't restrict target, for testing purposes
-        trustedTarget = '*';
-        window.parent.postMessage(JSON.stringify({eventType: eventType, eventData: eventData}), trustedTarget);
-      } catch (e) {
-        callback(e);
-      }
-    }
-    else {
-      callback({notAvailable: true});
-    }
-  };
-
-  function receiveEvent(eventType, eventData) {
-    var curEventHandlers = eventHandlers[eventType];
-    if (curEventHandlers === undefined ||
-        !curEventHandlers.length) {
-      return;
-    }
-    for (var i = 0; i < curEventHandlers.length; i++) {
-      try {
-        curEventHandlers[i](eventType, eventData);
-      } catch (e) {}
-    }
-  }
-
-  function onEvent (eventType, callback) {
-    if (eventHandlers[eventType] === undefined) {
-      eventHandlers[eventType] = [];
-    }
-    var index = eventHandlers[eventType].indexOf(callback);
-    if (index === -1) {
-      eventHandlers[eventType].push(callback);
-    }
-  };
-
-  function offEvent (eventType, callback) {
-    if (eventHandlers[eventType] === undefined) {
-      return;
-    }
-    var index = eventHandlers[eventType].indexOf(callback);
-    if (index === -1) {
-      return;
-    }
-    eventHandlers[eventType].splice(index, 1);
-  };
-
-  function openProtoUrl(url) {
-    if (!url.match(/^(web\+)?tgb?:\/\/./)) {
-      return false;
-    }
-    var wnd = false;
-    try {
-      wnd = window.open(url, '_blank');
-    } catch (e) {
-      wnd = false;
-    }
-    if (!wnd) {
-      location.href = url;
-    }
-    return true;
-  }
-
-  // For Windows Phone app
-  window.TelegramGameProxy_receiveEvent = receiveEvent;
-
-  window.TelegramGameProxy = {
-    initParams: initParams,
-    receiveEvent: receiveEvent,
-    onEvent: onEvent,
-    shareScore: function () {
-      postEvent('share_score', function (error) {
-        if (error) {
-          var shareScoreUrl = initParams.tgShareScoreUrl;
-          if (shareScoreUrl) {
-            openProtoUrl(shareScoreUrl);
-          }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sliding Puzzle Game</title>
+    <style>
+        body {
+            text-align: center;
+            font-family: Arial, sans-serif;
         }
-      });
-    }
-  };
+        .container {
+            width: 306px;
+            margin: auto;
+            display: flex;
+            flex-wrap: wrap;
+            border: 2px solid #000;
+        }
+        .tile {
+            width: 100px;
+            height: 100px;
+            border: 1px solid #000;
+            font-size: 24px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            background: lightgray;
+        }
+        .empty {
+            background: white;
+        }
+    </style>
+</head>
+<body>
 
-})();
+    <h1>Sliding Puzzle Game</h1>
+    <div class="container" id="puzzle-board"></div>
+    <br>
+    <button onclick="shuffle()">Shuffle</button>
+    
+    <script>
+        let size = 3; // 3x3 grid
+        let board = [];
+        let emptyTile = { row: 2, col: 2 };
+
+        function init() {
+            let puzzleBoard = document.getElementById("puzzle-board");
+            puzzleBoard.innerHTML = "";
+            let count = 1;
+
+            for (let i = 0; i < size; i++) {
+                board[i] = [];
+                for (let j = 0; j < size; j++) {
+                    let tile = document.createElement("div");
+                    tile.className = "tile";
+                    if (count < size * size) {
+                        tile.innerText = count;
+                        board[i][j] = count;
+                    } else {
+                        tile.classList.add("empty");
+                        board[i][j] = null;
+                        emptyTile = { row: i, col: j };
+                    }
+                    tile.onclick = () => moveTile(i, j);
+                    puzzleBoard.appendChild(tile);
+                    count++;
+                }
+            }
+            render();
+        }
+
+        function render() {
+            let tiles = document.querySelectorAll(".tile");
+            let index = 0;
+            for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                    tiles[index].innerText = board[i][j] ? board[i][j] : "";
+                    tiles[index].classList.toggle("empty", !board[i][j]);
+                    index++;
+                }
+            }
+        }
+
+        function moveTile(row, col) {
+            let diffRow = Math.abs(row - emptyTile.row);
+            let diffCol = Math.abs(col - emptyTile.col);
+            
+            if ((diffRow === 1 && diffCol === 0) || (diffRow === 0 && diffCol === 1)) {
+                board[emptyTile.row][emptyTile.col] = board[row][col];
+                board[row][col] = null;
+                emptyTile = { row, col };
+                render();
+            }
+        }
+
+        function shuffle() {
+            for (let i = 0; i < 100; i++) {
+                let possibleMoves = [
+                    { row: emptyTile.row - 1, col: emptyTile.col },
+                    { row: emptyTile.row + 1, col: emptyTile.col },
+                    { row: emptyTile.row, col: emptyTile.col - 1 },
+                    { row: emptyTile.row, col: emptyTile.col + 1 }
+                ].filter(pos => pos.row >= 0 && pos.row < size && pos.col >= 0 && pos.col < size);
+
+                let move = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                moveTile(move.row, move.col);
+            }
+        }
+
+        init();
+    </script>
+
+</body>
+</html>
+
+
+---
+
+How to Play:
+
+1. Click on tiles adjacent to the empty space to move them.
+
+
+2. Arrange the numbers in order from 1 to 8 with the empty space at the bottom right.
+
+
+3. Click "Shuffle" to randomize the tiles and start over.
+
+
+
+Would you like to add any images or a different puzzle size?
+
+
+  
